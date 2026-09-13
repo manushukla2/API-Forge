@@ -1,0 +1,27 @@
+﻿# UI
+PyQt6==6.7.0
+
+# HTTP Testing
+requests==2.31.0
+httpx==0.27.0
+
+# AI - Groq
+groq==0.9.0
+
+# API Parsing
+pyyaml==6.0.1
+jsonschema==4.22.0
+
+# PDF Processing
+pymupdf==1.24.5
+reportlab==4.2.0
+
+# HTML Report
+jinja2==3.1.4
+
+# Proxy / Traffic Capture
+mitmproxy==10.3.1
+
+# Utilities
+python-dotenv==1.0.1
+rich==13.7.1
