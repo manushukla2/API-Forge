@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "session_id": "test_report_001",
+    "generated_at": "2026-09-15 10:49:48",
+    "api_title": "Test API",
+    "api_version": "1.0.0",
+    "base_url": "https://api.example.com"
+  },
+  "summary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "pass_rate": 100.0,
+    "avg_latency": 245.5
+  },
+  "evidence": [
+    {
+      "id": "EV001",
+      "endpoint": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "headers": {},
+        "body": {}
+      },
+      "response": {
+        "status_code": 200,
+        "latency_ms": 245.5,
+        "headers": {},
+        "body": {},
+        "raw": "ok"
+      },
+      "assertions": {
+        "status": "passed",
+        "passed": 3,
+        "failed": 0,
+        "results": []
+      }
+    }
+  ]
+}
