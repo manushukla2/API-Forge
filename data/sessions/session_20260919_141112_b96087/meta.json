@@ -1,0 +1,10 @@
+{
+  "session_id": "session_20260919_141112_b96087",
+  "created_at": "2026-09-19T14:11:12.542758",
+  "api_title": "JSONPlaceholder API",
+  "api_version": "1.0.0",
+  "base_url": "https://jsonplaceholder.typicode.com",
+  "total_endpoints": 1,
+  "status": "running",
+  "updated_at": "2026-09-19T14:11:12.552686"
+}

@@ -17,77 +17,86 @@ class QAController:
         self.flow_builder     = FlowBuilder()
         self.assertion_engine = AssertionEngine()
 
-    def run_full_pipeline(
-        self,
-        source:      str,
-        auth_config: dict  = None,
-        on_progress: callable = None
-    ) -> dict:
+    def run_full_pipeline(self, source: str, auth_config: dict = None, on_progress: callable = None) -> dict:
         auth_config = auth_config or {"type": "none"}
 
-        # Step 1 — Input parse karo
         self._emit(on_progress, "Parsing input...", 10)
-        parsed = route_input(source)
+        parsed   = route_input(source)
         api_data = parsed["data"]
 
-        # Step 2 — Session create karo
         session_id = self.session_manager.create_session(api_data)
         self.session_manager.update_status(session_id, "running")
         collector  = EvidenceCollector(session_id)
 
-        # Step 3 — Flow build karo
         self._emit(on_progress, "Building API flow...", 20)
         flow = self.flow_builder.build(api_data)
 
-        # Step 4 — Auth setup
-        auth    = AuthHandler(auth_config)
-        runner  = APIRunner(
+        auth   = AuthHandler(auth_config)
+        runner = APIRunner(
             base_url = api_data.get("base_url", ""),
             headers  = auth.get_headers()
         )
 
-        # Step 5 — Har endpoint ke liye scenarios generate karo aur test karo
         endpoints = api_data.get("endpoints", [])
         total     = len(endpoints)
 
         for i, endpoint in enumerate(endpoints):
-            progress = 20 + int((i / total) * 60) if total > 0 else 80
-            self._emit(on_progress, f"Testing {endpoint.get('method')} {endpoint.get('path')}...", progress)
+            if not isinstance(endpoint, dict):
+                continue
 
-            # Scenarios generate karo
+            progress = 20 + int((i / total) * 60) if total > 0 else 80
+            self._emit(on_progress, f"Testing {endpoint.get('method','GET')} {endpoint.get('path','')}...", progress)
+
             scenario_data = self.scenario_gen.generate(endpoint)
             scenarios     = scenario_data.get("scenarios", [])
 
             if not scenarios:
-                scenarios = [{"assertions": [{"type": "status_in", "expected": [200, 201, 204]}]}]
+                scenarios = [{"assertions": []}]
 
-            # Har scenario run karo
             for scenario in scenarios:
-                ep_with_data = {**endpoint, **scenario}
-                response     = runner.run(ep_with_data)
-                assertions   = scenario.get("assertions", [])
-                result       = self.assertion_engine.run(response, assertions)
+                if not isinstance(scenario, dict):
+                    continue
+
+                ep_with_data = {**endpoint}
+                if scenario.get("body") and isinstance(scenario.get("body"), dict):
+                    ep_with_data["request_body"] = scenario["body"]
+                if scenario.get("headers") and isinstance(scenario.get("headers"), dict):
+                    ep_with_data["headers"] = {**endpoint.get("headers", {}), **scenario["headers"]}
+
+                response = runner.run(ep_with_data)
+
+                # Assertions — sirf dicts accept karo, strings skip karo
+                raw_assertions = scenario.get("assertions", [])
+                clean_assertions = []
+                for a in raw_assertions:
+                    if isinstance(a, dict):
+                        clean_assertions.append(a)
+
+                # Default assertions hamesha add karo
+                clean_assertions.append({"type": "status_in",        "expected": [200, 201, 204]})
+                clean_assertions.append({"type": "response_not_empty"})
+                clean_assertions.append({"type": "latency_under",     "max_ms": 5000})
+
+                result = self.assertion_engine.run(response, clean_assertions)
                 collector.collect(endpoint, response, result)
 
-        # Step 6 — Session save karo
         self._emit(on_progress, "Saving session...", 85)
         self.session_manager.update_status(session_id, "completed")
         collector.save_session()
 
-        # Step 7 — Report generate karo
         self._emit(on_progress, "Generating report...", 95)
-        reporter = ReportGenerator(session_id)
+        reporter  = ReportGenerator(session_id)
         html_path = reporter.generate(api_data, collector.get_all(), "html")
         json_path = reporter.generate(api_data, collector.get_all(), "json")
 
         self._emit(on_progress, "Done!", 100)
 
         return {
-            "session_id":  session_id,
-            "api_info":    api_data,
-            "flow":        flow,
-            "summary":     collector.get_summary(),
-            "evidence":    collector.get_all(),
+            "session_id": session_id,
+            "api_info":   api_data,
+            "flow":       flow,
+            "summary":    collector.get_summary(),
+            "evidence":   collector.get_all(),
             "reports": {
                 "html": html_path,
                 "json": json_path

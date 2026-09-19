@@ -5,8 +5,8 @@ from core.ai.ai_router import get_ai_router
 
 class ScenarioGenerator:
     def __init__(self):
-        self.router  = get_ai_router()
-        self.prompt  = self._load_prompt()
+        self.router = get_ai_router()
+        self.prompt = self._load_prompt()
 
     def _load_prompt(self) -> str:
         path = os.path.join(
@@ -28,26 +28,54 @@ Parameters:  {json.dumps(endpoint.get('parameters', []), indent=2)}
 Request Body:{json.dumps(endpoint.get('request_body', {}), indent=2)}
 Responses:   {json.dumps(endpoint.get('responses', {}), indent=2)}
 """
-        result = self.router.chat_json(self.prompt, user_msg)
-
         try:
-            data = json.loads(result)
-            # Ensure required fields
-            if "scenarios" not in data:
-                data["scenarios"] = []
+            result = self.router.chat_json(self.prompt, user_msg)
+            data   = json.loads(result)
+
+            # Ensure scenarios is a list of dicts
+            scenarios = data.get("scenarios", [])
+            clean_scenarios = []
+            for sc in scenarios:
+                if isinstance(sc, dict):
+                    clean_scenarios.append(sc)
+                elif isinstance(sc, str):
+                    # Skip string scenarios
+                    continue
+
+            data["scenarios"] = clean_scenarios
+
             if "endpoint" not in data:
                 data["endpoint"] = f"{endpoint.get('method')} {endpoint.get('path')}"
+            if "total_scenarios" not in data:
+                data["total_scenarios"] = len(clean_scenarios)
+
             return data
-        except Exception:
+
+        except Exception as e:
             return {
                 "endpoint":        f"{endpoint.get('method')} {endpoint.get('path')}",
-                "total_scenarios": 0,
-                "scenarios":       []
+                "total_scenarios": 1,
+                "scenarios": [
+                    {
+                        "id":       "TC001",
+                        "name":     "Default happy path",
+                        "category": "happy_path",
+                        "method":   endpoint.get("method", "GET"),
+                        "url":      endpoint.get("full_url", endpoint.get("path", "")),
+                        "headers":  {},
+                        "body":     {},
+                        "expected_status": 200,
+                        "assertions": [
+                            {"type": "status_in", "expected": [200, 201, 204]},
+                            {"type": "response_not_empty"}
+                        ]
+                    }
+                ]
             }
 
     def generate_bulk(self, endpoints: list) -> list:
         results = []
         for endpoint in endpoints:
-            result = self.generate(endpoint)
-            results.append(result)
+            if isinstance(endpoint, dict):
+                results.append(self.generate(endpoint))
         return results
